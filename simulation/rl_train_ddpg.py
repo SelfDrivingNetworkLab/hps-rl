@@ -1,13 +1,12 @@
 import os
 import sys
-
 sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
 
 import pandas
 import time
 import argparse
 import numpy as np
-from optimizationfns import MultiClassLM
+from drllib.optimizations import MultiClassLM
 
 
 from drllib import dynamic_models as models, utils, common
@@ -82,7 +81,9 @@ def run_ddpq(actiontype, env, test_env, n_hidden, featureList, device, gamma, op
 
     frame_idx = 0
     best_reward = None
-    while True:
+    
+    #while True:
+    for i in range(1000):
         frame_idx += 1
         buffer.populate(1)
         rewards_steps = exp_source.pop_rewards_steps()
@@ -147,8 +148,10 @@ def run_ddpq(actiontype, env, test_env, n_hidden, featureList, device, gamma, op
                         dftestrew.to_csv(csv_name, sep=',', index=False)
 
                     best_reward = rewards
-
-    pass
+            
+    if best_reward == None: 
+        return 0
+    return best_reward
 
 
 if __name__ == "__main__":

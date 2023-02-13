@@ -1,7 +1,16 @@
+import os
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__),'../'))
+
+import itertools
 import numpy as np
 import copy
 import multiprocessing as mp
+from mpi4py import MPI
 import simulation.rl_train_ddpg as ddpg
+from gym.envs.classic_control.cartpole import CartPoleEnv
+
+
 """
 E.g: 
     GA=GA4RL(model_name="DQN",nof_generations=3,pop_size=50,nof_elites=1,crossover_rate=0.7,mutation_prob=0.05)
@@ -94,7 +103,7 @@ class GA4RL():
             print("RL Model Could Not Found")
 
 
-    def RandomGene(self,gene_key):
+    def RandomGene(self,gene_key,rank=1,size=1):
         """
         :param gene_key: name of an hyper-parameter for the specified RL
         :return: random value for the hyper-parameter from its possible values specified in "self.PossibleGenesDict"
@@ -122,13 +131,14 @@ class GA4RL():
         return chr
 
 
-    def InstantiateRandomPopulation(self):
+    def InstantiateRandomPopulation(self, rank):
         """
         Instantiates random population with "pop_size" number of random individuals for the specified RL
         :return:
         """
-        for i in range(self.pop_size):
-            self.population.append(self.CreateRandomIndividual())
+        if rank == 0: 
+            for i in range(self.pop_size):
+                self.population.append(self.CreateRandomIndividual())
 
 
 
@@ -154,13 +164,11 @@ class GA4RL():
 
         elif (self.model_name == "DDPG"):
             #"batch_size", "step_size",
-    #                           "actor_learning_rate","critic_learning_rate","alpha_reward","beta_reward","gamma_reward",
-    #                           "test_iteration"]
+            #"actor_learning_rate","critic_learning_rate","alpha_reward","beta_reward","gamma_reward",
+            #"test_iteration"]
+
             featurelist = [chr['nodes_per_layer']]*(chr['hidden_layers'] + 1)
-            print(featurelist)
-            fitness = ddpg.run_ddpq("Discrete",self.env,self.test_env,chr['hidden_layers'],featurelist,self.device, chr['gamma'],"LM", chr['batch_size'], chr['step_size'], chr['actor_learning_rate'], chr['critic_learning_rate'],
-             chr['alpha_reward'], chr['beta_reward'], chr['gamma_reward'])
-            print(fitness)
+            fitness = ddpg.run_ddpq("Discrete",self.env,self.test_env,chr['hidden_layers'],featurelist, self.device, chr['gamma'],"LM", chr['batch_size'], chr['step_size'], chr['actor_learning_rate'], chr['critic_learning_rate'], chr['alpha_reward'], chr['beta_reward'], chr['gamma_reward'])
             return fitness
 
         elif (self.model_name == "TRPO"):
@@ -179,17 +187,24 @@ class GA4RL():
             print("RL Model Could Not Found")
 
 
-    def CalculateCumulativeFitness(self):
+    def CalculateCumulativeFitness(self, rank):
 
         """
         Calculates cumulative fitness for "self.pop_cum_fitness". Where each cell  "self.pop_cum_fitness" correspond to
     the sum of fitness values of individuals from "self.population" upto and including the cell index.
         :return:
         """
-        self.pop_cum_fitness[0] = self.pop_fitness[0]
-        for i in range(self.pop_size-1):
-            self.pop_cum_fitness[i+1]=self.pop_cum_fitness[i]+self.pop_fitness[i+1]
-        self.pop_cum_fitness = self.pop_cum_fitness / self.pop_cum_fitness[-1]
+        if rank == 0: 
+            self.pop_fitness = np.concatenate(self.pop_fitness)
+            self.pop_fitness = np.where(self.pop_fitness==None, 0, self.pop_fitness)
+
+            self.pop_cum_fitness[0] = self.pop_fitness[0]
+            for i in range(self.pop_size-1):
+                self.pop_cum_fitness[i+1]=self.pop_cum_fitness[i]+self.pop_fitness[i+1]
+            if self.pop_cum_fitness[-1] == 0: 
+                self.pop_cum_fitness = self.pop_cum_fitness / 1
+            else: 
+                self.pop_cum_fitness = self.pop_cum_fitness / self.pop_cum_fitness[-1]
 
     def RouletteSelect(self):
         """
@@ -199,6 +214,9 @@ class GA4RL():
         for i in range(self.pop_size):
             if (rn<self.pop_cum_fitness[i]):
                 return self.population[i]
+        return self.population[int(self.pop_size * rn)]
+
+        
 
     def RouletteSelect_Crossover_Mutate(self):
         """
@@ -230,7 +248,6 @@ class GA4RL():
         :return:
         """
 
-
         pop_fitness_copy = copy.copy(self.pop_fitness)
 
         fitness_floor = np.min(pop_fitness_copy) - 1
@@ -245,18 +262,20 @@ class GA4RL():
         self.best_chrm=self.next_population[0]
 
 
-    def AdvenceGeneration(self):
+    def AdvenceGeneration(self, rank):
         """
         Elites are selected and transferred to next generation, remaining slots on the next population are filled with
     mutated offsprings.
         :return:
         """
-
-        self.Elitist()
-        for i in range(self.pop_size-self.nof_elites):
-            self.next_population.append(self.RouletteSelect_Crossover_Mutate())
-        self.population=copy.copy(self.next_population)
-        self.next_population=[]
+        if rank == 0: 
+            self.Elitist()
+            
+            for i in range(self.pop_size-self.nof_elites):
+                self.next_population.append(self.RouletteSelect_Crossover_Mutate())
+            
+            self.population=copy.copy(self.next_population)
+            self.next_population=[]
 
 
     def Run(self,numProcesses,numThreads):
@@ -266,19 +285,57 @@ class GA4RL():
     throughout the generations. With "mp.Pool" fitness for each individual is calculated in parallel.
         """
 
-        pool = mp.Pool(mp.cpu_count())
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
+        size = comm.Get_size()
 
-        self.InstantiateRandomPopulation()
+        self.InstantiateRandomPopulation(rank)
 
         for generation in range(self.nof_generations):
 
-            self.pop_fitness=\
-                np.array(pool.map(self.CalculateFitness, [chr for chr in self.population]))
+            if rank == 0:
+                self.population = [self.population[i:i + size] for i in range(0, len(self.population), size)]
+            else:
+                self.population = []
 
-            self.CalculateCumulativeFitness()
-            self.AdvenceGeneration()
+            self.population = comm.scatter(self.population, root=0)
+            comm.barrier()
+            
+            if rank != 0: 
+                self.pop_fitness = np.array([self.CalculateFitness(chr) for chr in self.population])
 
-        pool.close()
+            if rank != 0:
+                if isinstance(self.population[0], list): 
+                    self.population = list(itertools.chain.from_iterable(self.population))
+
+            comm.barrier()
+
+            self.population = comm.gather(self.population, root=0)
+
+            comm.barrier()
+            if rank == 0:
+                self.population = list(itertools.chain.from_iterable(self.population))
+
+            comm.barrier()
+            self.pop_fitness = comm.gather(self.pop_fitness, root=0)
+            comm.barrier()
+
+            self.CalculateCumulativeFitness(rank)
+            self.AdvenceGeneration(rank)
 
         return self.best_chrm,self.fitness_log
 
+def runMPI(): 
+    '''
+    Creates Population to Train RL Agents using MPI 
+
+    Update weights on the (rank == 0) master process, and retrains the model to compute fitness on (rank >= 1) the worker processes.
+
+    Run the following command to test locally:
+        mpiexec -n 3 python3 searchmethods/GA4RL.py 
+    '''
+    #test = GA4RL("DQN", "DISCRETE", CartPoleEnv(), CartPoleEnv(), "cpu", "LM", 3, 3, 1, 0.5, 0.05)
+    test = GA4RL("DDPG", "DISCRETE", CartPoleEnv(), CartPoleEnv(), "cpu", "LM", 3, 9, 1, 0.5, 0.05)
+    test.Run(1, 1)
+
+runMPI()
