@@ -26,8 +26,8 @@ class DDPGActor(nn.Module):
         self.net = nn.Sequential(*modules)
 
     def forward(self, x):
-        print("INPUT")
-        print(x)
+        #print("INPUT")
+        #print(x)
         return self.net(x.reshape(4, 1).t())
 
 class DDPGCritic(nn.Module):

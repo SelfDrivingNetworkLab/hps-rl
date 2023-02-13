@@ -217,8 +217,8 @@ class ExperienceSource:
 
     def pop_rewards_steps(self):
         res = list(zip(self.total_rewards, self.total_steps))
-        print("POP REWARDS")
-        print(res)
+        #print("POP REWARDS")
+        #print(res)
         if res:
             self.total_rewards, self.total_steps = [], []
         return res
@@ -258,7 +258,7 @@ class ExperienceSourceFirstLast(ExperienceSource, object): # added object to ada
 
     def __iter__(self):
         for exp in super(ExperienceSourceFirstLast, self).__iter__():
-            print(exp)
+            #print(exp)
             if exp[-1].done and len(exp) <= self.steps:
                 last_state = None
                 elems = exp
@@ -340,7 +340,7 @@ class ExperienceReplayBufferMultiEnv:
 
     def set_exp_source(self, experience_source):
         assert isinstance(experience_source, (ExperienceSource, type(None)))
-        print(experience_source)
+        #print(experience_source)
         self.experience_source_iter = None if experience_source is None else iter(experience_source)
 
     def sample(self, batch_size):
@@ -460,11 +460,11 @@ class RewardTracker:
         if epsilon is not None:
             self.writer.add_scalar("epsilon", epsilon, frame)
         self.writer.add_scalar("reward_100", mean_reward, frame)
-        print("mean_reward")
-        print(mean_reward)
+        #print("mean_reward")
+        #print(mean_reward)
         self.writer.add_scalar("reward", reward, frame)
-        print("reward")
-        print(reward)
+        #print("reward")
+        #print(reward)
         return mean_reward if len(self.total_rewards) > 30 else None
 
 def unpack_batch_ddqn(batch, device="cpu"):

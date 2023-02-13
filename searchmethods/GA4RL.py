@@ -169,10 +169,10 @@ class GA4RL():
             #"batch_size", "step_size",
             #"actor_learning_rate","critic_learning_rate","alpha_reward","beta_reward","gamma_reward",
             #"test_iteration"]
-            print("chromosome")
-            print(chr)
+            #print("chromosome")
+            #print(chr)
             featurelist = [chr['nodes_per_layer']]*(chr['hidden_layers'] + 1)
-            print(featurelist)
+            #print(featurelist)
             fitness = ddpg.run_ddpq("Discrete",self.env,self.test_env,chr['hidden_layers'],featurelist, self.device, chr['gamma'],"LM", chr['batch_size'], chr['step_size'], chr['actor_learning_rate'], chr['critic_learning_rate'], chr['alpha_reward'], chr['beta_reward'], chr['gamma_reward'])
             #print(fitness)
             return fitness
@@ -207,10 +207,10 @@ class GA4RL():
         #print("Population Size")
         #print(self.pop_size)
         if rank == 0: 
-            print("Population Cumulative Fitness")
-            print(self.pop_cum_fitness)
-            print("Population Fitness")
-            print(self.pop_fitness)
+            #print("Population Cumulative Fitness")
+            #print(self.pop_cum_fitness)
+            #print("Population Fitness")
+            #print(self.pop_fitness)
             self.pop_fitness = np.concatenate(self.pop_fitness)
             self.pop_fitness = np.where(self.pop_fitness==None, 0, self.pop_fitness)
 
@@ -226,13 +226,13 @@ class GA4RL():
         """
         :return: Fitness proportional roulette wheen selection of a chromosome
         """
-        print("ROULETTE POPULATION")
-        print(self.population)
-        print("ROULETTE CUMULATIVE FITNESS")
-        print(self.pop_cum_fitness)
-        print("POP SIZE")
-        print(self.pop_size)
-        print(len(self.population))
+        #print("ROULETTE POPULATION")
+        #print(self.population)
+        #print("ROULETTE CUMULATIVE FITNESS")
+        #print(self.pop_cum_fitness)
+        #print("POP SIZE")
+        #print(self.pop_size)
+        #print(len(self.population))
         rn=np.random.rand()
         for i in range(self.pop_size):
             if (rn<self.pop_cum_fitness[i]):
@@ -249,15 +249,15 @@ class GA4RL():
 
         rn = np.random.rand()
         chr1 = copy.copy(self.RouletteSelect())
-        print("Chromosome1")
-        print(chr1)
+        #print("Chromosome1")
+        #print(chr1)
         gene_keys = self.get_GeneKeys()
 
         if (rn<self.crossover_rate):
             
             chr2 = copy.copy(self.RouletteSelect())
-            print("Chromosome2")
-            print(chr2)
+            #print("Chromosome2")
+            #print(chr2)
 
             preserve_from=np.random.randint(0,len(chr1)-1)
             for gene_key in gene_keys[0:preserve_from]:
@@ -265,8 +265,8 @@ class GA4RL():
 
         for gene_key in gene_keys:
             if(np.random.rand()<self.mutation_prob):
-                print("Chromosome1")
-                print(chr1)
+                #print("Chromosome1")
+                #print(chr1)
                 chr1[gene_key] = self.RandomGene(gene_key)
         return chr1
 
@@ -302,8 +302,8 @@ class GA4RL():
             self.Elitist()
             
             #lst = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
-            print("OLD POPULATION")
-            print(self.population)
+            #print("OLD POPULATION")
+            #print(self.population)
             '''
             for i in range(len(self.population)): 
                 if isinstance(self.population[i], list):
@@ -312,8 +312,8 @@ class GA4RL():
             
             #if isinstance(self.population, list):
             #    self.population = list(itertools.chain.from_iterable(self.population))
-            print("NEW POPULATION")
-            print(self.population)
+            #print("NEW POPULATION")
+            #print(self.population)
             '''
             while isinstance(self.population[0], list):
                 print("OLD POPULATION")
@@ -345,9 +345,11 @@ class GA4RL():
         size = comm.Get_size()
 
         self.InstantiateRandomPopulation(rank)
+        '''
         if rank == 0: 
             print("INITIAL POPULATION")
             print(self.population)
+        '''
 
         for generation in range(self.nof_generations):
             #self.pop_fitness = np.array(pool.map(self.CalculateFitness, [chr for chr in self.population]))
@@ -369,20 +371,21 @@ class GA4RL():
             self.population = comm.scatter(self.population, root=0)
             comm.barrier()
             
+            '''
             if rank == 0: 
                 print("Master")
                 print(self.population)
             else:
                 print("Worker")
                 print(self.population)
-            
+            '''
             #self.pop_fitness = np.array(pool.map(self.CalculateFitness, [chr for chr in self.population]))
-            print("Current population chromosomes 0")
-            print(self.population)
+            #print("Current population chromosomes 0")
+            #print(self.population)
             if rank != 0: 
                 self.pop_fitness = np.array([self.CalculateFitness(chr) for chr in self.population])
-            print("Current population chromosomes 1")
-            print(self.population)
+            #print("Current population chromosomes 1")
+            #print(self.population)
 
             if rank != 0:
                 if isinstance(self.population[0], list): 
@@ -393,25 +396,25 @@ class GA4RL():
             comm.barrier()
             if rank == 0:
                 self.population = list(itertools.chain.from_iterable(self.population))
-                print("POPULATION")
-                print(self.population)
-                print("POPULATION SIZE")
+                #print("POPULATION")
+                #print(self.population)
+                #print("POPULATION SIZE")
                 #print(len(self.population))
-                print(len(self.population[0]))
+                #print(len(self.population[0]))
             #time.sleep(1000000)
             comm.barrier()
             self.pop_fitness = comm.gather(self.pop_fitness, root=0)
             comm.barrier()
 
-            print("Current population chromosomes 2")
-            print(self.population)
+            #print("Current population chromosomes 2")
+            #print(self.population)
             self.CalculateCumulativeFitness(rank)
             self.AdvenceGeneration(rank)
-            print("GENERATION")
-            print(generation)
+            #print("GENERATION")
+            #print(generation)
             
         #pool.close()
-        print("COMPLETE")
+        #print("COMPLETE")
 
         return self.best_chrm,self.fitness_log
 
@@ -427,6 +430,6 @@ def runMPI():
     #test = GA4RL("DQN", "DISCRETE", CartPoleEnv(), CartPoleEnv(), "cpu", "LM", 3, 3, 1, 0.5, 0.05)
     test = GA4RL("DDPG", "DISCRETE", CartPoleEnv(), CartPoleEnv(), "cpu", "LM", 3, 9, 1, 0.5, 0.05)
     test.Run(1, 1)
-    print("COMPLETE")
+    #print("COMPLETE")
 
 runMPI()
