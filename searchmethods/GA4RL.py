@@ -327,9 +327,9 @@ class GA4RL():
 
 def runMPI(): 
     '''
-    Creates Population to Train RL Agents
+    Creates Population to Train RL Agents using MPI 
 
-    Update weights on the (rank == 0) master process, and retrain the model and compute fitness on (rank >= 1) worker processes.
+    Update weights on the (rank == 0) master process, and retrains the model to compute fitness on (rank >= 1) the worker processes.
 
     Run the following command to test locally:
         mpiexec -n 3 python3 searchmethods/GA4RL.py 
