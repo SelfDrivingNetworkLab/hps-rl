@@ -168,11 +168,12 @@ class GA4RL():
             #"batch_size", "step_size",
             #"actor_learning_rate","critic_learning_rate","alpha_reward","beta_reward","gamma_reward",
             #"test_iteration"]
+            print("chromosome")
+            print(chr)
             featurelist = [chr['nodes_per_layer']]*(chr['hidden_layers'] + 1)
             print(featurelist)
-            fitness = ddpg.run_ddpq("Discrete",self.env,self.test_env,chr['hidden_layers'],featurelist,self.device, chr['gamma'],"LM", chr['batch_size'], chr['step_size'], chr['actor_learning_rate'], chr['critic_learning_rate'],
-             chr['alpha_reward'], chr['beta_reward'], chr['gamma_reward'])
-            print(fitness)
+            fitness = ddpg.run_ddpq("Discrete",self.env,self.test_env,chr['hidden_layers'],featurelist, self.device, chr['gamma'],"LM", chr['batch_size'], chr['step_size'], chr['actor_learning_rate'], chr['critic_learning_rate'], chr['alpha_reward'], chr['beta_reward'], chr['gamma_reward'])
+            #print(fitness)
             return fitness
 
         elif (self.model_name == "TRPO"):
@@ -198,12 +199,12 @@ class GA4RL():
     the sum of fitness values of individuals from "self.population" upto and including the cell index.
         :return:
         """
-        print("Cumulative Fitness")
-        print(self.pop_cum_fitness)
-        print("Population Fitness")
-        print(self.pop_fitness)
-        print("Population Size")
-        print(self.pop_size)
+        #print("Cumulative Fitness")
+        #print(self.pop_cum_fitness)
+        #print("Population Fitness")
+        #print(self.pop_fitness)
+        #print("Population Size")
+        #print(self.pop_size)
         if rank == 0: 
             self.pop_cum_fitness[0] = self.pop_fitness[0]
             for i in range(self.pop_size-1):
@@ -291,23 +292,67 @@ class GA4RL():
         size = comm.Get_size()
 
         self.InstantiateRandomPopulation(rank)
+        if rank == 0: 
+            print("INITIAL POPULATION")
+            print(self.population)
 
         for generation in range(self.nof_generations):
             #self.pop_fitness = np.array(pool.map(self.CalculateFitness, [chr for chr in self.population]))
-            print(self.population)
-            comm.scatter(self.population, root=0)
+            '''
+            if rank == 0: 
+                print("Master")
+                print(self.population)
+            else:
+                print("Worker")
+                print(self.population)
+            '''
+            nprocs = comm.Get_size()
+            if rank == 0:
+                #data = [MyClass(i) for i in range(4)]
+                self.population = [self.population[i:i + nprocs] for i in range(0, len(self.population), nprocs)]
+            else:
+                self.population = []
+
+            self.population = comm.scatter(self.population, root=0)
+
             comm.barrier()
+            
+            if rank == 0: 
+                print("Master")
+                print(self.population)
+            else:
+                print("Worker")
+                print(self.population)
+            
+
             #self.pop_fitness = np.array(pool.map(self.CalculateFitness, [chr for chr in self.population]))
+            print("Current population chromosomes")
+            print(self.population)
             self.pop_fitness = np.array([self.CalculateFitness(chr) for chr in self.population])
+            print("Current population chromosomes")
+            print(self.population)
+            self.population = comm.gather(self.population, root=0)
+            comm.barrier()
+            print("Current population chromosomes")
+            print(self.population)
             self.CalculateCumulativeFitness(rank)
             self.AdvenceGeneration(rank)
-
+            
         pool.close()
 
         return self.best_chrm,self.fitness_log
 
 def runMPI(): 
-    test = GA4RL("DQN", "DISCRETE", CartPoleEnv(), CartPoleEnv(), "cpu", "LM", 3, 3, 1, 0.5, 0.05)
+    '''
+    Creates Population to Train RL Agents
+
+    Update weights on the (rank == 0) master process, and retrain the model and compute fitness on (rank >= 1) worker processes.
+
+    Run the following command to test locally:
+        mpiexec -n 3 python3 searchmethods/GA4RL.py 
+    '''
+    #test = GA4RL("DQN", "DISCRETE", CartPoleEnv(), CartPoleEnv(), "cpu", "LM", 3, 3, 1, 0.5, 0.05)
+    test = GA4RL("DDPG", "DISCRETE", CartPoleEnv(), CartPoleEnv(), "cpu", "LM", 3, 9, 1, 0.5, 0.05)
     test.Run(1, 1)
 
 runMPI()

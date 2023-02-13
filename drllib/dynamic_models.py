@@ -26,7 +26,9 @@ class DDPGActor(nn.Module):
         self.net = nn.Sequential(*modules)
 
     def forward(self, x):
-        return self.net(x)
+        print("INPUT")
+        print(x)
+        return self.net(x.reshape(4, 1).t())
 
 class DDPGCritic(nn.Module):
     def __init__(self, obs_size, act_size, features1 = 400, features2 = 300):
@@ -94,7 +96,11 @@ class AgentDDPG(BaseAgent):
         return None
 
     def __call__(self, states, agent_states):
+        print("INPUT STATES")
+        print(states)
         states_v = utils.float32_preprocessor(states).to(self.device)
+        print("INPUT STATES")
+        print(states_v)
         mu_v = self.net(states_v)
         actions = mu_v.data.cpu().numpy()
 
