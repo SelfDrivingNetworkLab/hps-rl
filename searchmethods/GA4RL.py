@@ -5,6 +5,7 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(__file__),'../'))
 #print(os.path.join(os.path.dirname(__file__),'../'))
 
+import itertools
 import numpy as np
 import copy
 import multiprocessing as mp
@@ -206,19 +207,39 @@ class GA4RL():
         #print("Population Size")
         #print(self.pop_size)
         if rank == 0: 
+            print("Population Cumulative Fitness")
+            print(self.pop_cum_fitness)
+            print("Population Fitness")
+            print(self.pop_fitness)
+            self.pop_fitness = np.concatenate(self.pop_fitness)
+            self.pop_fitness = np.where(self.pop_fitness==None, 0, self.pop_fitness)
+
             self.pop_cum_fitness[0] = self.pop_fitness[0]
             for i in range(self.pop_size-1):
                 self.pop_cum_fitness[i+1]=self.pop_cum_fitness[i]+self.pop_fitness[i+1]
-            self.pop_cum_fitness = self.pop_cum_fitness / self.pop_cum_fitness[-1]
+            if self.pop_cum_fitness[-1] == 0: 
+                self.pop_cum_fitness = self.pop_cum_fitness / 1
+            else: 
+                self.pop_cum_fitness = self.pop_cum_fitness / self.pop_cum_fitness[-1]
 
     def RouletteSelect(self):
         """
         :return: Fitness proportional roulette wheen selection of a chromosome
         """
+        print("ROULETTE POPULATION")
+        print(self.population)
+        print("ROULETTE CUMULATIVE FITNESS")
+        print(self.pop_cum_fitness)
+        print("POP SIZE")
+        print(self.pop_size)
+        print(len(self.population))
         rn=np.random.rand()
         for i in range(self.pop_size):
             if (rn<self.pop_cum_fitness[i]):
                 return self.population[i]
+        return self.population[int(self.pop_size * rn)]
+
+        
 
     def RouletteSelect_Crossover_Mutate(self):
         """
@@ -228,10 +249,15 @@ class GA4RL():
 
         rn = np.random.rand()
         chr1 = copy.copy(self.RouletteSelect())
+        print("Chromosome1")
+        print(chr1)
         gene_keys = self.get_GeneKeys()
 
         if (rn<self.crossover_rate):
+            
             chr2 = copy.copy(self.RouletteSelect())
+            print("Chromosome2")
+            print(chr2)
 
             preserve_from=np.random.randint(0,len(chr1)-1)
             for gene_key in gene_keys[0:preserve_from]:
@@ -239,6 +265,8 @@ class GA4RL():
 
         for gene_key in gene_keys:
             if(np.random.rand()<self.mutation_prob):
+                print("Chromosome1")
+                print(chr1)
                 chr1[gene_key] = self.RandomGene(gene_key)
         return chr1
 
@@ -249,7 +277,6 @@ class GA4RL():
     generation to "self.fitness_log". Also best individual "self.best_chr" is updated.
         :return:
         """
-
 
         pop_fitness_copy = copy.copy(self.pop_fitness)
 
@@ -273,8 +300,34 @@ class GA4RL():
         """
         if rank == 0: 
             self.Elitist()
+            
+            #lst = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+            print("OLD POPULATION")
+            print(self.population)
+            '''
+            for i in range(len(self.population)): 
+                if isinstance(self.population[i], list):
+                    self.population[i] = list(itertools.chain.from_iterable(self.population[i]))
+            '''
+            
+            #if isinstance(self.population, list):
+            #    self.population = list(itertools.chain.from_iterable(self.population))
+            print("NEW POPULATION")
+            print(self.population)
+            '''
+            while isinstance(self.population[0], list):
+                print("OLD POPULATION")
+                print(self.population)
+                self.population = [item for sublist in self.population for item in sublist]#[0]
+            print("NEW POPULATION")
+            print(self.population)
+            '''
+            #self.population = self.population[0]
+            #self.pop_size = len(self.population)
+            
             for i in range(self.pop_size-self.nof_elites):
                 self.next_population.append(self.RouletteSelect_Crossover_Mutate())
+            
             self.population=copy.copy(self.next_population)
             self.next_population=[]
 
@@ -286,7 +339,7 @@ class GA4RL():
     throughout the generations. With "mp.Pool" fitness for each individual is calculated in parallel.
         """
 
-        pool = mp.Pool(mp.cpu_count())
+        #pool = mp.Pool(mp.cpu_count())
         comm = MPI.COMM_WORLD
         rank = comm.Get_rank()
         size = comm.Get_size()
@@ -314,7 +367,6 @@ class GA4RL():
                 self.population = []
 
             self.population = comm.scatter(self.population, root=0)
-
             comm.barrier()
             
             if rank == 0: 
@@ -324,21 +376,42 @@ class GA4RL():
                 print("Worker")
                 print(self.population)
             
-
             #self.pop_fitness = np.array(pool.map(self.CalculateFitness, [chr for chr in self.population]))
-            print("Current population chromosomes")
+            print("Current population chromosomes 0")
             print(self.population)
-            self.pop_fitness = np.array([self.CalculateFitness(chr) for chr in self.population])
-            print("Current population chromosomes")
+            if rank != 0: 
+                self.pop_fitness = np.array([self.CalculateFitness(chr) for chr in self.population])
+            print("Current population chromosomes 1")
             print(self.population)
+
+            if rank != 0:
+                if isinstance(self.population[0], list): 
+                    self.population = list(itertools.chain.from_iterable(self.population))
+
+            comm.barrier()
             self.population = comm.gather(self.population, root=0)
             comm.barrier()
-            print("Current population chromosomes")
+            if rank == 0:
+                self.population = list(itertools.chain.from_iterable(self.population))
+                print("POPULATION")
+                print(self.population)
+                print("POPULATION SIZE")
+                #print(len(self.population))
+                print(len(self.population[0]))
+            #time.sleep(1000000)
+            comm.barrier()
+            self.pop_fitness = comm.gather(self.pop_fitness, root=0)
+            comm.barrier()
+
+            print("Current population chromosomes 2")
             print(self.population)
             self.CalculateCumulativeFitness(rank)
             self.AdvenceGeneration(rank)
+            print("GENERATION")
+            print(generation)
             
-        pool.close()
+        #pool.close()
+        print("COMPLETE")
 
         return self.best_chrm,self.fitness_log
 
@@ -354,5 +427,6 @@ def runMPI():
     #test = GA4RL("DQN", "DISCRETE", CartPoleEnv(), CartPoleEnv(), "cpu", "LM", 3, 3, 1, 0.5, 0.05)
     test = GA4RL("DDPG", "DISCRETE", CartPoleEnv(), CartPoleEnv(), "cpu", "LM", 3, 9, 1, 0.5, 0.05)
     test.Run(1, 1)
+    print("COMPLETE")
 
 runMPI()

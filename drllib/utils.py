@@ -152,13 +152,13 @@ class ExperienceSource:
                     actions[g_idx] = action
                     agent_states[g_idx] = new_agent_states[idx]
             grouped_actions = _group_list(actions, env_lens)
-            print("Grouped Actions")
-            print(grouped_actions)
+            #print("Grouped Actions")
+            #print(grouped_actions)
 
             global_ofs = 0
             for env_idx, (env, action_n) in enumerate(zip(self.pool, grouped_actions)):
-                print("LAST ACTION")
-                print(action_n)
+                #print("LAST ACTION")
+                #print(action_n)
                 if self.vectorized:
                     '''
                     if action_n <= 0.5: 
@@ -172,8 +172,8 @@ class ExperienceSource:
                         action_n[0] = 0
                     else: 
                         action_n[0] = 1
-                    print("LAST ACTION")
-                    print(action_n)
+                    #print("LAST ACTION")
+                    #print(action_n)
                     next_state, r, is_done, _, _ = env.step(action_n[0])
                     next_state_n, r_n, is_done_n = [next_state], [r], [is_done]
 
@@ -209,7 +209,7 @@ class ExperienceSource:
             iter_idx += 1
 
     def pop_total_rewards(self):
-        r = self.total_rewards
+        r = list(self.total_rewards)
         if r:
             self.total_rewards = []
             self.total_steps = []
@@ -217,6 +217,8 @@ class ExperienceSource:
 
     def pop_rewards_steps(self):
         res = list(zip(self.total_rewards, self.total_steps))
+        print("POP REWARDS")
+        print(res)
         if res:
             self.total_rewards, self.total_steps = [], []
         return res
@@ -484,7 +486,7 @@ def unpack_batch_ddqn(batch, device="cpu"):
     return states_v, actions_v, rewards_v, dones_t, last_states_v
 
 def float32_preprocessor(states):
-    print(states)
+    #print(states)
     if len(states[0]) > 0 and states[0][1] == {}: 
         np_states = np.array(states[0][0], dtype=np.float32)
     else: 

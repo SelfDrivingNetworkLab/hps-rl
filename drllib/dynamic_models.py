@@ -96,11 +96,11 @@ class AgentDDPG(BaseAgent):
         return None
 
     def __call__(self, states, agent_states):
-        print("INPUT STATES")
-        print(states)
+        #print("INPUT STATES")
+        #print(states)
         states_v = utils.float32_preprocessor(states).to(self.device)
-        print("INPUT STATES")
-        print(states_v)
+        #print("INPUT STATES")
+        #print(states_v)
         mu_v = self.net(states_v)
         actions = mu_v.data.cpu().numpy()
 
