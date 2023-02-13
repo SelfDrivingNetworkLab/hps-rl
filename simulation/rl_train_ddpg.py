@@ -87,8 +87,6 @@ def run_ddpq(actiontype, env, test_env, n_hidden, featureList, device, gamma, op
         frame_idx += 1
         buffer.populate(1)
         rewards_steps = exp_source.pop_rewards_steps()
-        #print("REWARDS")
-        #print(rewards_steps)
         if rewards_steps:
             rewards, steps = zip(*rewards_steps)
 
@@ -139,8 +137,6 @@ def run_ddpq(actiontype, env, test_env, n_hidden, featureList, device, gamma, op
                 test_reward.append(rewards)
                 test_steps.append(steps)
 
-                #print("ALL Rewards")
-                #print(rewards)
                 if best_reward is None or best_reward < rewards:
                     if best_reward is not None:
                         print("Best reward updated: %.3f -> %.3f" % (best_reward, rewards))
@@ -152,16 +148,10 @@ def run_ddpq(actiontype, env, test_env, n_hidden, featureList, device, gamma, op
                         dftestrew.to_csv(csv_name, sep=',', index=False)
 
                     best_reward = rewards
-                #print("BEST Rewards")
-                #print(best_reward)
-                
-            #print("ALL Rewards")
-            #print(rewards)  
             
     if best_reward == None: 
         return 0
     return best_reward
-    #pass
 
 
 if __name__ == "__main__":

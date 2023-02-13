@@ -152,28 +152,16 @@ class ExperienceSource:
                     actions[g_idx] = action
                     agent_states[g_idx] = new_agent_states[idx]
             grouped_actions = _group_list(actions, env_lens)
-            #print("Grouped Actions")
-            #print(grouped_actions)
 
             global_ofs = 0
             for env_idx, (env, action_n) in enumerate(zip(self.pool, grouped_actions)):
-                #print("LAST ACTION")
-                #print(action_n)
                 if self.vectorized:
-                    '''
-                    if action_n <= 0.5: 
-                        action_n = 0
-                    else: 
-                        action_n = 1
-                    '''
                     next_state_n, r_n, is_done_n, _, _ = env.step(action_n)
                 else:
                     if action_n[0] <= 0.5: 
                         action_n[0] = 0
                     else: 
                         action_n[0] = 1
-                    #print("LAST ACTION")
-                    #print(action_n)
                     next_state, r, is_done, _, _ = env.step(action_n[0])
                     next_state_n, r_n, is_done_n = [next_state], [r], [is_done]
 
@@ -217,8 +205,6 @@ class ExperienceSource:
 
     def pop_rewards_steps(self):
         res = list(zip(self.total_rewards, self.total_steps))
-        #print("POP REWARDS")
-        #print(res)
         if res:
             self.total_rewards, self.total_steps = [], []
         return res
@@ -258,7 +244,6 @@ class ExperienceSourceFirstLast(ExperienceSource, object): # added object to ada
 
     def __iter__(self):
         for exp in super(ExperienceSourceFirstLast, self).__iter__():
-            #print(exp)
             if exp[-1].done and len(exp) <= self.steps:
                 last_state = None
                 elems = exp
@@ -340,7 +325,6 @@ class ExperienceReplayBufferMultiEnv:
 
     def set_exp_source(self, experience_source):
         assert isinstance(experience_source, (ExperienceSource, type(None)))
-        #print(experience_source)
         self.experience_source_iter = None if experience_source is None else iter(experience_source)
 
     def sample(self, batch_size):
@@ -460,11 +444,7 @@ class RewardTracker:
         if epsilon is not None:
             self.writer.add_scalar("epsilon", epsilon, frame)
         self.writer.add_scalar("reward_100", mean_reward, frame)
-        #print("mean_reward")
-        #print(mean_reward)
         self.writer.add_scalar("reward", reward, frame)
-        #print("reward")
-        #print(reward)
         return mean_reward if len(self.total_rewards) > 30 else None
 
 def unpack_batch_ddqn(batch, device="cpu"):
@@ -486,11 +466,9 @@ def unpack_batch_ddqn(batch, device="cpu"):
     return states_v, actions_v, rewards_v, dones_t, last_states_v
 
 def float32_preprocessor(states):
-    #print(states)
     if len(states[0]) > 0 and states[0][1] == {}: 
         np_states = np.array(states[0][0], dtype=np.float32)
     else: 
         np_states = np.array(states[0], dtype=np.float32)
 
-    
     return torch.tensor(np_states)
