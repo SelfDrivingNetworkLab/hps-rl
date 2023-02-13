@@ -361,10 +361,8 @@ class GA4RL():
                 print("Worker")
                 print(self.population)
             '''
-            nprocs = comm.Get_size()
             if rank == 0:
-                #data = [MyClass(i) for i in range(4)]
-                self.population = [self.population[i:i + nprocs] for i in range(0, len(self.population), nprocs)]
+                self.population = [self.population[i:i + size] for i in range(0, len(self.population), size)]
             else:
                 self.population = []
 
@@ -392,7 +390,9 @@ class GA4RL():
                     self.population = list(itertools.chain.from_iterable(self.population))
 
             comm.barrier()
+            
             self.population = comm.gather(self.population, root=0)
+
             comm.barrier()
             if rank == 0:
                 self.population = list(itertools.chain.from_iterable(self.population))
